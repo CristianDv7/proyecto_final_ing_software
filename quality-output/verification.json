@@ -11,13 +11,13 @@
     "coverage_fuente": "build/reports/jacoco/test/jacocoTestReport.xml (LINE: covered=200, missed=5); jacocoTestCoverageVerification en verde (por clase >80% y global >=80%)"
   },
   "security": {
-    "fuente": "Semgrep (auto + p/java + p/secrets + p/security-audit) sobre src/main + grep de secretos",
+    "fuente": "Semgrep con SEMGREP_APP_TOKEN (configs p/java + p/secrets + p/security-audit): 306 reglas sobre 33 archivos, 0 findings, 0 errores del motor + grep de secretos",
     "critical": 0,
     "high": 0,
     "secrets": 0,
     "hallazgos": [
-      { "tipo": "informativo", "lugar": "src/main/resources/application.yaml:12", "detalle": "password vacio (\"\") del datasource H2 en memoria (username sa); config de desarrollo por defecto, no es un secreto real" },
-      { "tipo": "informativo", "lugar": "infrastructure/web/RegistrarLocalController.java:13", "detalle": "endpoint POST /api/v1/locales expuesto sin autenticacion; el proyecto no incluye spring-boot-starter-security ni SecurityConfig (MVP). Los cambios de esta iteracion no alteran la superficie de seguridad" }
+      { "severidad": "informativo", "archivo": "src/main/resources/application.yaml", "linea": 12, "nota": "password vacio (\"\") del datasource H2 en memoria (username sa); config de desarrollo por defecto, no es un secreto real" },
+      { "severidad": "informativo", "archivo": "src/main/java/com/cj7/ubicate/infrastructure/web/RegistrarLocalController.java", "linea": 13, "nota": "endpoint POST /api/v1/locales expuesto sin autenticacion; el proyecto no incluye spring-boot-starter-security ni SecurityConfig (MVP); los cambios de esta iteracion no alteran la superficie de seguridad" }
     ]
   },
   "spec": "specs/001-registro-local/spec.md",
