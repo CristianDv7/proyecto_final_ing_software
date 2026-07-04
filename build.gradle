@@ -2,6 +2,8 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '4.1.0'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'org.openapi.generator' version '7.16.0'
+    id 'jacoco'
 }
 
 group = 'com.example'
@@ -10,7 +12,7 @@ description = 'ubicate-serviceSDD'
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(25)
+        languageVersion = JavaLanguageVersion.of(26)
     }
 }
 
@@ -18,20 +20,127 @@ repositories {
     mavenCentral()
 }
 
+ext {
+    cucumberVersion = '7.20.1'
+    swaggerAnnotationsVersion = '2.2.22'
+}
+
 dependencies {
-    implementation 'org.springframework.boot:spring-boot-h2console'
-    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-h2console'
+    // Requerido por el código generado por openapi-generator (generator 'spring')
+    implementation "io.swagger.core.v3:swagger-annotations:${swaggerAnnotationsVersion}"
+
     compileOnly 'org.projectlombok:lombok'
-    runtimeOnly 'com.h2database:h2'
     annotationProcessor 'org.projectlombok:lombok'
+    runtimeOnly 'com.h2database:h2'
+
     testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
     testCompileOnly 'org.projectlombok:lombok'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testAnnotationProcessor 'org.projectlombok:lombok'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    // BDD (Cucumber) — pruebas de integración y funcionales Given-When-Then
+    testImplementation "io.cucumber:cucumber-java:${cucumberVersion}"
+    testImplementation "io.cucumber:cucumber-spring:${cucumberVersion}"
+    testImplementation "io.cucumber:cucumber-junit-platform-engine:${cucumberVersion}"
+    testImplementation 'org.junit.platform:junit-platform-suite'
+}
+
+// ---------------------------------------------------------------------------
+// API First: generación de interfaces y DTOs desde el contrato OpenAPI.
+// El contrato es la fuente de verdad; no se edita a mano lo generado.
+// ---------------------------------------------------------------------------
+openApiGenerate {
+    generatorName = 'spring'
+    inputSpec = "$rootDir/specs/001-registro-local/contracts/registro-local.openapi.yaml"
+    outputDir = layout.buildDirectory.dir('generated/openapi').get().asFile.toString()
+    apiPackage = 'com.cj7.ubicate.infrastructure.web.generated.api'
+    modelPackage = 'com.cj7.ubicate.infrastructure.web.generated.model'
+    configOptions = [
+            interfaceOnly        : 'true',
+            useSpringBoot3       : 'true',
+            openApiNullable      : 'false',
+            useTags              : 'true',
+            skipDefaultInterface : 'false',
+            documentationProvider: 'none',
+            useJakartaEe         : 'true'
+    ]
+}
+
+sourceSets {
+    main {
+        java {
+            srcDir layout.buildDirectory.dir('generated/openapi/src/main/java')
+        }
+    }
+}
+
+tasks.named('compileJava') {
+    dependsOn tasks.named('openApiGenerate')
 }
 
 tasks.named('test') {
     useJUnitPlatform()
+    // Cucumber usa la plataforma JUnit; publicar el nombre del plugin
+    systemProperty 'cucumber.junit-platform.naming-strategy', 'long'
+    finalizedBy jacocoTestReport
+}
+
+// ---------------------------------------------------------------------------
+// Cobertura (JaCoCo): reportes y quality gate exigido por la constitución.
+//   - Global (BUNDLE) line coverage >= 0.80
+//   - Por clase (CLASS) line coverage > 0.80
+// Se excluye el código generado, la clase de arranque y la config de infraestructura.
+// ---------------------------------------------------------------------------
+def coverageExclusions = [
+        '**/generated/**',
+        '**/UbicateServiceSddApplication*',
+        '**/infrastructure/config/**'
+]
+
+jacocoTestReport {
+    dependsOn tasks.named('test')
+    reports {
+        html.required = true
+        xml.required = true
+    }
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, exclude: coverageExclusions)
+        }))
+    }
+}
+
+jacocoTestCoverageVerification {
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, exclude: coverageExclusions)
+        }))
+    }
+    violationRules {
+        rule {
+            element = 'BUNDLE'
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.80
+            }
+        }
+        rule {
+            element = 'CLASS'
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.80
+            }
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn jacocoTestCoverageVerification
 }

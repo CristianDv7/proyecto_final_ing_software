@@ -1,1 +1,21 @@
-spring.application.name=ubicate-serviceSDD
+server:
+  servlet:
+    context-path: /api/v1
+
+spring:
+  application:
+    name: ubicate-serviceSDD
+  datasource:
+    url: jdbc:h2:mem:ubicate;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/schema/schema.sql
+      data-locations: classpath:db/data/data.sql

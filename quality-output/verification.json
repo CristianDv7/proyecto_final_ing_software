@@ -1,0 +1,50 @@
+{
+  "proyecto": "ubicate-serviceSDD",
+  "version": "0.0.1-SNAPSHOT",
+  "fecha": "2026-07-04",
+  "commit": "6a059f0+local",
+  "tests": {
+    "comando": "./gradlew clean test jacocoTestReport",
+    "passed": 29,
+    "total": 29,
+    "coverage": 97.56,
+    "coverage_fuente": "build/reports/jacoco/test/jacocoTestReport.xml (LINE: covered=200, missed=5); jacocoTestCoverageVerification en verde (por clase >80% y global >=80%)"
+  },
+  "security": {
+    "fuente": "Semgrep (auto + p/java + p/secrets + p/security-audit) sobre src/main + grep de secretos",
+    "critical": 0,
+    "high": 0,
+    "secrets": 0,
+    "hallazgos": [
+      { "tipo": "informativo", "lugar": "src/main/resources/application.yaml:12", "detalle": "password vacio (\"\") del datasource H2 en memoria (username sa); config de desarrollo por defecto, no es un secreto real" },
+      { "tipo": "informativo", "lugar": "infrastructure/web/RegistrarLocalController.java:13", "detalle": "endpoint POST /api/v1/locales expuesto sin autenticacion; el proyecto no incluye spring-boot-starter-security ni SecurityConfig (MVP). Los cambios de esta iteracion no alteran la superficie de seguridad" }
+    ]
+  },
+  "spec": "specs/001-registro-local/spec.md",
+  "criteria": [
+    { "id": "FR-001", "fuente": "spec.md - FR-001 (registro en una sola pantalla, max 10 campos) + Clarification 2026-07-04", "status": "cumple",
+      "evidencia": "ContratoRegistroCamposTest.elContratoDeRegistroNoExcedeDiezCampos PASA (RegistrarLocalRequest expone 6 campos <= 10; registro en una unica operacion POST /locales). La presentacion en una sola pantalla se delega al cliente movil segun la Clarification del spec." },
+    { "id": "FR-002", "fuente": "spec.md - FR-002 (campos obligatorios)", "status": "cumple",
+      "evidencia": "LocalTest.informaTodosLosCamposObligatoriosFaltantes PASA (exige nombre, tipoNegocioId, ubicacion, whatsapp, horarios) + BDD 'formulario incompleto -> 422' (RegistroLocalSteps.registraSinWhatsAppNiHorarios)." },
+    { "id": "FR-003", "fuente": "spec.md - FR-003 (campos opcionales)", "status": "cumple",
+      "evidencia": "BDD 'Se publica el perfil solo con los campos obligatorios (servicios opcionales)' PASA + LocalTest.publicaLocalConDatosObligatorios verifica servicios vacio." },
+    { "id": "FR-004", "fuente": "spec.md - FR-004 (validar e indicar campos faltantes)", "status": "cumple",
+      "evidencia": "LocalTest.informaTodosLosCamposObligatoriosFaltantes asserta la lista de campos + BDD 'la respuesta informa campos obligatorios faltantes' (camposFaltantes no vacio) via ValidationErrorResponse." },
+    { "id": "FR-005", "fuente": "spec.md - FR-005 (deteccion GPS sin direccion)", "status": "cumple",
+      "evidencia": "BDD 'La ubicacion por GPS se registra sin escribir direccion' PASA (expone origen 'GPS' sin direccionTexto) + UbicacionTest.creaUbicacionValida con OrigenUbicacion.GPS." },
+    { "id": "FR-006", "fuente": "spec.md - FR-006 (ubicacion manual cuando no hay GPS)", "status": "cumple",
+      "evidencia": "BDD 'El mismo comerciante puede registrar otro local en distinta ubicacion' usa origen MANUAL y publica 201 + UbicacionTest.rechazaLongitudFueraDeRango con OrigenUbicacion.MANUAL." },
+    { "id": "FR-007", "fuente": "spec.md - FR-007 (WhatsApp identifica y contacta al comerciante)", "status": "cumple",
+      "evidencia": "RegistrarLocalServiceTest.publicaLocalYCreaComercianteCuandoDatosValidos (crea comerciante por WhatsApp) + reutilizaComercianteExistentePorWhatsapp (reutiliza) + BDD 'El numero de WhatsApp queda disponible como contacto' (expone whatsapp)." },
+    { "id": "FR-008", "fuente": "spec.md - FR-008 (publica estado PUBLICADO / descubrible)", "status": "cumple",
+      "evidencia": "LocalTest.publicaLocalConDatosObligatorios asserta EstadoPublicacion.PUBLICADO + BDD 'el local queda publicado con codigo 201' verifica estadoPublicacion=PUBLICADO. Busqueda por cercania fuera de alcance (clarificacion del spec)." },
+    { "id": "FR-009", "fuente": "spec.md - FR-009 (flujo completo en menos de 5 minutos) + Clarification 2026-07-04", "status": "cumple",
+      "evidencia": "El servicio contribuye con una unica operacion SINCRONA: el perfil queda PUBLICADO en la misma respuesta, sin procesamiento diferido. Evidencia: BDD 'el local queda publicado con codigo 201' asserta estadoPublicacion=PUBLICADO en la misma llamada POST. El umbral extremo a extremo se mide en el cliente (Clarification del spec, SC-001)." },
+    { "id": "FR-010", "fuente": "spec.md - FR-010 (validar formato WhatsApp y coherencia de horario)", "status": "cumple",
+      "evidencia": "BDD 'Un WhatsApp con formato invalido es rechazado' (12345 -> 422, patron OpenAPI ^\\+[1-9]\\d{7,14}$) + BDD 'Un horario incoherente es rechazado' (cierre<apertura -> 422) + HorarioAtencionTest.rechazaCierreAntesDeAperturaSinCruce." },
+    { "id": "FR-011", "fuente": "spec.md - FR-011 (registrar sin cuentas de redes sociales)", "status": "cumple",
+      "evidencia": "BDD 'Registro exitoso con los datos obligatorios completos' publica 201 usando solo nombre/tipo/ubicacion/whatsapp/horarios; no existe dependencia ni campo de red social en el contrato ni en el codigo -> el registro no requiere redes sociales." },
+    { "id": "FR-012", "fuente": "spec.md - FR-012 (atomicidad + reintento seguro sin duplicados) / Edge Case 'Conexion intermitente al guardar'", "status": "cumple",
+      "evidencia": "ATOMICIDAD: RegistroLocalAtomicidadTest.unFalloAlGuardarElLocalRevierteTambienElComercianteRecienCreado PASA (un fallo al persistir el local revierte @Transactional el comerciante -> 0 filas, sin estado parcial). CONCURRENCIA: RegistroLocalConcurrenciaTest.anteSolicitudesConcurrentesSobreLaMismaFranjaSoloUnaProspera PASA (8 hilos simultaneos -> exactamente 1 local y 1 comerciante) garantizado por la restriccion unica uq_local_whatsapp_ubicacion en schema.sql, con DataIntegrityViolationException mapeada a LocalDuplicadoException (409) en LocalPersistenceAdapter. REINTENTO SEGURO/DUPLICADOS: RegistrarLocalServiceTest.lanzaDuplicadoCuandoYaExisteMismoWhatsappYUbicacion + BDD 'Un local duplicado es rechazado' (409)." }
+  ]
+}

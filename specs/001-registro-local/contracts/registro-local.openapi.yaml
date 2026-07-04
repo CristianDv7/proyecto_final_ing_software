@@ -1,0 +1,207 @@
+openapi: 3.0.3
+info:
+  title: Ubicate Service - Registro de Local API
+  description: >-
+    API para el registro de un local en una sola operación (US-01). El comerciante
+    envía en una única solicitud los datos capturados en una sola pantalla y el
+    servicio valida los campos obligatorios y publica el perfil para búsquedas.
+    Contrato fuente de verdad (API First); las interfaces y DTOs se generan con
+    openapi-generator.
+  version: 1.0.0
+servers:
+  - url: /api/v1
+    description: Base path del servicio
+tags:
+  - name: locales
+    description: Registro y publicación de locales
+paths:
+  /locales:
+    post:
+      tags:
+        - locales
+      summary: Registrar y publicar un local
+      description: >-
+        Registra un local con los datos de la pantalla única. Si los campos
+        obligatorios están completos y son válidos, el perfil se publica y queda
+        visible en búsquedas. Si falta o es inválido algún campo obligatorio,
+        responde 422 indicando los campos afectados.
+      operationId: registrarLocal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistrarLocalRequest'
+      responses:
+        '201':
+          description: Local registrado y publicado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocalResponse'
+        '409':
+          description: Posible duplicado (mismo WhatsApp y ubicación equivalente).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Campos obligatorios faltantes o inválidos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+components:
+  schemas:
+    RegistrarLocalRequest:
+      type: object
+      description: >-
+        Datos del formulario de registro (máx. 10 campos). Obligatorios: nombre,
+        tipoNegocioId, ubicacion, whatsapp, horarios. Opcional: servicios.
+      required:
+        - nombre
+        - tipoNegocioId
+        - ubicacion
+        - whatsapp
+        - horarios
+      properties:
+        nombre:
+          type: string
+          minLength: 2
+          maxLength: 120
+          example: Panadería La Espiga
+        tipoNegocioId:
+          type: integer
+          format: int64
+          description: Identificador del tipo de negocio (catálogo precargado).
+          example: 3
+        ubicacion:
+          $ref: '#/components/schemas/Ubicacion'
+        whatsapp:
+          type: string
+          description: Número de contacto en formato E.164.
+          pattern: '^\+[1-9]\d{7,14}$'
+          example: '+593987654321'
+        horarios:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/HorarioAtencion'
+        servicios:
+          type: array
+          description: Opcional. Servicios ofrecidos por el local.
+          items:
+            type: string
+            minLength: 1
+          example:
+            - Domicilio
+            - Pedidos por WhatsApp
+    Ubicacion:
+      type: object
+      required:
+        - latitud
+        - longitud
+        - origen
+      properties:
+        latitud:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+          example: -0.180653
+        longitud:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+          example: -78.467834
+        origen:
+          type: string
+          enum: [GPS, MANUAL]
+          example: GPS
+        direccionTexto:
+          type: string
+          description: Opcional, referencia legible de la ubicación.
+          example: Av. Amazonas y Naciones Unidas
+    HorarioAtencion:
+      type: object
+      required:
+        - diaSemana
+        - horaApertura
+        - horaCierre
+      properties:
+        diaSemana:
+          type: string
+          enum: [LUN, MAR, MIE, JUE, VIE, SAB, DOM]
+          example: LUN
+        horaApertura:
+          type: string
+          format: time
+          example: '08:00:00'
+        horaCierre:
+          type: string
+          format: time
+          example: '18:00:00'
+        cruzaMedianoche:
+          type: boolean
+          default: false
+    LocalResponse:
+      type: object
+      required:
+        - id
+        - nombre
+        - tipoNegocioId
+        - ubicacion
+        - whatsapp
+        - horarios
+        - estadoPublicacion
+      properties:
+        id:
+          type: string
+          format: uuid
+        nombre:
+          type: string
+        tipoNegocioId:
+          type: integer
+          format: int64
+        ubicacion:
+          $ref: '#/components/schemas/Ubicacion'
+        whatsapp:
+          type: string
+        horarios:
+          type: array
+          items:
+            $ref: '#/components/schemas/HorarioAtencion'
+        servicios:
+          type: array
+          items:
+            type: string
+        estadoPublicacion:
+          type: string
+          enum: [BORRADOR, PUBLICADO]
+          example: PUBLICADO
+    ValidationErrorResponse:
+      type: object
+      required:
+        - mensaje
+        - camposFaltantes
+      properties:
+        mensaje:
+          type: string
+          example: Faltan campos obligatorios para publicar el perfil.
+        camposFaltantes:
+          type: array
+          description: Lista de campos obligatorios faltantes o inválidos.
+          items:
+            type: string
+          example:
+            - whatsapp
+            - horarios
+    ErrorResponse:
+      type: object
+      required:
+        - mensaje
+      properties:
+        mensaje:
+          type: string
+          example: Ya existe un local con este WhatsApp y ubicación equivalente.

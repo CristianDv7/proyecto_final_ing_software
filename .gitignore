@@ -5,6 +5,16 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
+### Maven ###
+target/
+*.class
+!.mvn/wrapper/maven-wrapper.jar
+
+### Logs / env ###
+*.log
+.env
+.env.*
+
 ### STS ###
 .apt_generated
 .classpath

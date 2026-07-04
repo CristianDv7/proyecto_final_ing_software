@@ -8,6 +8,37 @@
 
 **Input**: User description: "US-01 · Registro del local en una sola pantalla · épica E-01 · 5 pts — Como comerciante local sin perfil previo, quiero registrar mi negocio (nombre, tipo, ubicación, horario y servicios) en una sola pantalla desde el teléfono en menos de 5 minutos, para aparecer en las búsquedas de consumidores cercanos sin gestionar redes sociales ni detener la atención al cliente. Origen: us:US-01, req:R-01, req:R-09, req:R-12, pain:invisibilidad-geografica, pain:registro-complejo"
 
+## Clarifications
+
+### Session 2026-07-04
+
+- Q: ¿La búsqueda por cercanía de consumidores forma parte de este servicio? →
+  A: No. La búsqueda es una capacidad **externa** de la plataforma. Este servicio se limita
+  a publicar el perfil y marcarlo como **descubrible** (estado `PUBLICADO`); no implementa
+  el endpoint ni el indexado de búsqueda. (Afecta FR-008, SC-002)
+- Q: ¿Qué significa "preservar los datos ante error o interrupción" para el backend? →
+  A: El estado del formulario es responsabilidad del **cliente** (móvil), que conserva los
+  datos y permite reintentar. El **servicio** garantiza **atomicidad** (un fallo no crea un
+  local parcialmente publicado) y **reintento seguro** (reenviar los mismos datos no produce
+  duplicados). (Afecta FR-012, edge case de conexión intermitente)
+- Q: ¿Cómo se relaciona el Comerciante con el WhatsApp del registro? →
+  A: El comerciante se **identifica por su número de WhatsApp**. Durante el registro el
+  servicio **crea el comerciante si no existe** (resuelto por ese número) o **reutiliza** el
+  existente. En el MVP, el WhatsApp de contacto del local **coincide** con el del comerciante:
+  el formulario captura un único número. (Afecta FR-007, entidades Local/Comerciante)
+- Q: ¿Qué tipo tiene el identificador de Tipo de Negocio? →
+  A: Entero de 64 bits (`Long` / `integer int64`), consistente en contrato, modelo y esquema.
+- Q: ¿Qué parte de "una sola pantalla con máximo 10 campos" (FR-001) verifica este servicio? →
+  A: El invariante verificable por el backend es que el registro es **una única operación**
+  (`POST /locales`) cuyo contrato expone **≤ 10 campos**. La presentación efectiva "en una sola
+  pantalla" es responsabilidad del **cliente móvil**; el servicio no la renderiza. (Afecta FR-001)
+- Q: ¿Qué parte del "menos de 5 minutos" (FR-009) verifica este servicio? →
+  A: FR-009 mide el **tiempo total del flujo en el cliente** (ver Assumptions). La contribución
+  verificable del servicio es que el registro es una **única operación síncrona**: el perfil queda
+  `PUBLICADO` en la **misma respuesta**, sin procesamiento diferido, con latencia despreciable frente
+  al presupuesto de 5 minutos. El cumplimiento del umbral extremo a extremo se mide en el cliente.
+  (Afecta FR-009, SC-001)
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Registro rápido del local en una sola pantalla (Priority: P1)
@@ -77,17 +108,21 @@ queda publicado y visible en búsquedas cercanas en menos de 5 minutos.
   la posición del local sin requerir que el comerciante escriba una dirección.
 - **FR-006**: El sistema MUST permitir ingresar o ajustar la ubicación manualmente cuando el
   GPS no esté disponible o sea rechazado.
-- **FR-007**: El sistema MUST capturar un número de WhatsApp y exponerlo en el perfil de modo
-  que un consumidor pueda contactar al comercio directamente por ese número sin pasos adicionales.
-- **FR-008**: El sistema MUST publicar el perfil del local y hacerlo visible en las búsquedas
-  de consumidores cercanos una vez guardado con los campos obligatorios completos.
+- **FR-007**: El sistema MUST capturar un único número de WhatsApp que identifica al comerciante
+  (creándolo o reutilizándolo por ese número) y que además se expone como contacto del local, de
+  modo que un consumidor pueda contactarlo directamente por ese número sin pasos adicionales.
+- **FR-008**: El sistema MUST publicar el perfil del local (estado `PUBLICADO`) y marcarlo como
+  descubrible una vez guardado con los campos obligatorios completos. La búsqueda por cercanía es
+  una capacidad externa de la plataforma y queda fuera del alcance de este servicio.
 - **FR-009**: El sistema MUST completar el flujo de registro (desde inicio hasta perfil visible)
   en menos de 5 minutos para un comerciante sin perfil previo.
 - **FR-010**: El sistema MUST validar el formato del número de WhatsApp y la coherencia del
   horario (apertura/cierre) antes de publicar.
 - **FR-011**: El sistema MUST permitir registrar el local sin requerir cuentas de redes sociales.
-- **FR-012**: El sistema MUST preservar los datos ya ingresados ante un error o interrupción al
-  guardar, permitiendo reintentar sin recomenzar el formulario.
+- **FR-012**: El sistema MUST registrar el local de forma atómica (un error o interrupción al
+  guardar NO deja un perfil parcialmente publicado) y MUST hacer seguro el reintento (reenviar los
+  mismos datos no genera duplicados). La preservación del contenido ya escrito en el formulario es
+  responsabilidad del cliente, que permite reintentar sin recomenzar.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -106,8 +141,8 @@ queda publicado y visible en búsquedas cercanas en menos de 5 minutos.
 
 - **SC-001**: El 90% de los comerciantes sin perfil previo completa el registro y obtiene un
   perfil visible en búsquedas en menos de 5 minutos.
-- **SC-002**: El 100% de los locales publicados con datos obligatorios completos aparece en las
-  búsquedas de consumidores cercanos.
+- **SC-002**: El 100% de los locales con datos obligatorios completos queda en estado `PUBLICADO`
+  y marcado como descubrible para la capacidad de búsqueda de la plataforma.
 - **SC-003**: Al menos el 80% de los registros usa la detección de ubicación por GPS sin que el
   comerciante escriba una dirección.
 - **SC-004**: El 100% de los perfiles publicados incluye un número de WhatsApp de contacto
